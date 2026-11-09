@@ -27,32 +27,47 @@ const loading = ref(false)
 const data = ref(null)
 const error = ref(null)
 
-const fetchProtectedData = () => {
+const fetchProtectedData = async () => {
+  loading.value = true
+  error.value = null
+
   if (!authStore.validateToken()) {
-    error.value = 'Токен недействителен'
+    error.value = 'Сессия истекла. Пожалуйста, войдите снова.'
+    loading.value = false
     return
   }
 
-  loading.value = true
-  error.value = null
-  data.value = null
+  try {
+    const response = await fetch('https://jsonplaceholder.typicode.com/posts/1', {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`,
+        'Content-Type': 'application/json'
+      }
+    })
 
-  setTimeout(() => {
-    data.value = {
-      message: 'Секретные данные администратора',
-      users: ['admin', 'user'],
-      token: authStore.token
+    if (!response.ok) {
+      if (response.status === 401) {
+        authStore.logout()
+        error.value = 'Требуется повторная авторизация.'
+      } else {
+        error.value = `Ошибка сервера: ${response.status}`
+      }
+      loading.value = false
+      return
     }
+
+    data.value = await response.json()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Произошла ошибка сети'
+  } finally {
     loading.value = false
-  }, 1000)
+  }
 }
 </script>
 
 <style scoped>
-.page { max-width: 600px; margin: 2rem auto; }
-.admin-data { background: #f0f0f0; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
-.btn-primary { background: #3b82f6; color: white; padding: 0.7rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-.error-message { color: #c62828; margin: 1rem 0; }
-pre { white-space: pre-wrap; word-break: break-word; }
+.admin-data { background: #f3f4f6; padding: 1rem; border-radius: 6px; margin-top: 1rem; }
+pre { margin: 0; font-size: 0.9rem; }
+.btn-primary { padding: 0.7rem 1rem; background: #0b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.error-message { color: #c62828; margin-top: 1rem; }
 </style>
